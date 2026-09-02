@@ -1,0 +1,44 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Flatpak Builder <builder@localhost>
+Date: Wed, 2 Sep 2026 00:00:00 +0000
+Subject: [PATCH] qt: avoid blocking invoke on the GUI thread during RHI probe
+
+The initial graphics API probe runs while VLC's Qt interface thread owns the
+QApplication.  A BlockingQueuedConnection to qApp from that same thread is a
+deadlock, which prevents the Qt interface from opening on Linux/Wayland.
+
+Run the probe directly when already on the application thread and retain the
+blocking queued invocation for callers on other threads.
+---
+ modules/gui/qt/qt.cpp | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/modules/gui/qt/qt.cpp b/modules/gui/qt/qt.cpp
+index 0d0b3a93c8..e7d5b7e7c5 100644
+--- a/modules/gui/qt/qt.cpp
++++ b/modules/gui/qt/qt.cpp
+@@ -1044,7 +1044,7 @@ static void *Thread( void *obj )
+ #endif
+ 
+         std::optional<QPair<QSGRendererInterface::GraphicsApi, bool>> retGlProbe;
+-        QMetaObject::invokeMethod(qApp, [&retGlProbe]() {
++        auto probeOpenGL = [&retGlProbe]() {
+             // Due to offscreen surface involvement, this has to be done in the
+             // gui thread only:
+             QRhiGles2InitParams params;
+@@ -1062,7 +1062,14 @@ static void *Thread( void *obj )
+                 QSurfaceFormat::setDefaultFormat(*format);
+             }
+             delete params.fallbackSurface;
+-        }, Qt::BlockingQueuedConnection);
++        };
++
++        if (QThread::currentThread() == qApp->thread())
++            probeOpenGL();
++        else
++            QMetaObject::invokeMethod(qApp, probeOpenGL,
++                                      Qt::BlockingQueuedConnection);
++
+         if (retGlProbe)
+             return *retGlProbe;
+ 

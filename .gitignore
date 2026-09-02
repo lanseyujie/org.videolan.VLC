@@ -1,0 +1,6 @@
+/.cache/
+/.flatpak-builder/
+/.flatpak-home/
+/build-dir/
+/dist/
+/repo/

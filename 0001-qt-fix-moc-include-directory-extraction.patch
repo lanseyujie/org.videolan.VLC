@@ -1,0 +1,26 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Flatpak Builder <builder@localhost>
+Date: Wed, 2 Sep 2026 00:00:00 +0000
+Subject: [PATCH] qt: fix moc include directory extraction
+
+Use the regular expression match when reading qmake's moc_include_dirs.
+Using the stale line variable produces a bare -I and makes Qt 6.11 moc fail
+Q_INTERFACES declarations with "Undefined interface".
+---
+ modules/gui/qt/scripts/static_dirs.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/modules/gui/qt/scripts/static_dirs.py b/modules/gui/qt/scripts/static_dirs.py
+index a3f751bc73..64907124fc 100755
+--- a/modules/gui/qt/scripts/static_dirs.py
++++ b/modules/gui/qt/scripts/static_dirs.py
+@@ -120,7 +120,7 @@ for line in makefile.splitlines():
+         elif args.moc_include_dirs:
+             m = moc_include_dirs_re.match(line)
+             if m:
+-                for i in l.strip().split(' '):
+-                    result += f"-I{i}"
++                for i in m.group(1).split():
++                    result += f" -I{i}"
+ 
+     for generated in sources:
